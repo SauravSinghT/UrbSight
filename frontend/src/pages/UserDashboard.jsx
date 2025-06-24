@@ -46,13 +46,19 @@ export default function UserDashboard() {
           {complaints.map((c) => (
             <div key={c._id} className="bg-white border p-4 rounded shadow">
               <h2 className="text-xl font-semibold">{c.title}</h2>
-              <p className="text-gray-600">{c.description}</p>
+              <p className="text-sm text-orange-900 font-medium">Complaint ID: <span className="font-mono">{c.complaintId}</span></p>
+              <p className="text-gray-600">Description: " {c.description} "</p>
               <p className="text-sm text-gray-500">Department: {c.department} | Region: {c.region}</p>
               <p className="text-sm text-gray-500">Priority: {c.priority}</p>
               <p className="text-sm text-blue-600">Status: <strong>{c.status}</strong></p>
-              {c.createdAt && (
-                <p className="text-xs text-gray-400">Submitted: {new Date(c.createdAt).toLocaleString()}</p>
-              )}
+
+{c.status === "Rejected" && c.rejectReason && (
+  <div className="mt-3 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded">
+    <strong>Rejection Reason:</strong> {c.rejectReason}
+  </div>
+)}
+
+
               <div className="flex justify-end mt-2">
   <button
     onClick={() => handleDelete(c._id)}

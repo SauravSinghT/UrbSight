@@ -22,22 +22,25 @@ export default function Navbar() {
     {/* Navigation Links */}
     <div className="space-x-6 text-lg flex items-center">
       {token && (
-        <Link
-          to={role === "admin" ? "/admin" : "/user"}
-          className={location.pathname.includes(role) ? "underline font-semibold" : ""}
-        >
-          Dashboard
-        </Link>
-      )}
+  <Link
+    to={["admin", "block-admin", "group-admin", "super-admin"].includes(role) ? "/admin" : "/user"}
+    className={location.pathname.includes("admin") ? "underline font-semibold" : ""}
+  >
+    Dashboard
+  </Link>
+)}
 
-      {token && role === "admin" && (
-        <Link
-          to="/admin/complaints"
-          className={location.pathname === "/admin/complaints" ? "underline font-semibold" : ""}
-        >
-          Complaints Registered
-        </Link>
-      )}
+
+      {token && ["admin", "super-admin", "group-admin", "block-admin"].includes(role) && (
+  <Link
+    to="/admin/complaints"
+    className={location.pathname === "/admin/complaints" ? "underline font-semibold" : ""}
+  >
+    Complaints Registered
+  </Link>
+)}
+
+
 
       {token && (
         <Link to="/submit" className={location.pathname === "/submit" ? "underline font-semibold" : ""}>

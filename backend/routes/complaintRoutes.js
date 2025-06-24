@@ -23,12 +23,17 @@ router.get("/my", auth, getMyComplaints);
 router.get("/priority-queue", auth, getPrioritizedComplaints);
 
 // ADMIN ROUTES
-router.get("/all", auth, checkRole("admin", "superadmin"), getAllComplaints);
-router.put("/update/:id", auth, checkRole("admin", "superadmin"), updateComplaintStatus);
-router.get("/stats", auth, checkRole("admin", "superadmin"), getComplaintStats);
+router.get("/all", auth, checkRole("block-admin", "admin","group-admin", "super-admin")
+, getAllComplaints);
+router.put("/update/:id", auth, checkRole("block-admin", "admin","group-admin", "super-admin")
+, updateComplaintStatus);
+router.get("/stats", auth, checkRole("block-admin","admin", "group-admin", "super-admin")
+, getComplaintStats);
+
 
 // Reply to complaint (email)
-router.post("/:id/reply", auth, checkRole("admin", "superadmin"), replyToComplaint);
+router.post("/:id/reply", auth, checkRole("block-admin", "group-admin", "super-admin")
+, replyToComplaint);
 router.delete("/:id", auth, deleteComplaint);
 
 

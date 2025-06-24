@@ -2,3 +2,19 @@
 .input {
   @apply w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500;
 }
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-blink-fast {
+  animation: blink 0.5s infinite;
+}
+
+.animate-blink-medium {
+  animation: blink 1s infinite;
+}
+
+.animate-blink-slow {
+  animation: blink 2s infinite;
+}

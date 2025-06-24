@@ -19,7 +19,7 @@ function App() {
     <Navbar />
     <Routes>
       <Route path="/admin/complaints" element={
-  <ProtectedRoute role="admin">
+  <ProtectedRoute role={["admin", "super-admin", "group-admin", "block-admin"]}>
     <ComplaintList />
   </ProtectedRoute>
 } />

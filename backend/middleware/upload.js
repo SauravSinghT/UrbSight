@@ -19,10 +19,11 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|pdf/;
+  const allowedTypes = /jpeg|jpg|png|webp|pdf/;
   const ext = path.extname(file.originalname).toLowerCase();
   if (allowedTypes.test(ext)) cb(null, true);
-  else cb(new Error("Only JPEG, PNG, and PDF files are allowed"), false);
+  else cb(new Error("Only JPEG, PNG, WebP, and PDF files are allowed"), false);
 };
+
 
 module.exports = multer({ storage, fileFilter });

@@ -125,6 +125,7 @@ export default function AdminDashboard() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      
     </div>
   );
 }

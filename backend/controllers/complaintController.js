@@ -4,34 +4,47 @@ const sendEmail = require("../utils/sendEmail");
 
 
 
+function generateComplaintId() {
+  return 'CMP-' + Date.now().toString().slice(-6);  // e.g., CMP-351234
+}
 // Create new complaint
 exports.createComplaint = async (req, res) => {
   try {
     const { title, description, department, region, priority } = req.body;
     const file = req.file ? req.file.filename : null;
 
+    // ✅ Get user info to use their location (state/district/block)
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    // ✅ Create the complaint with user's location
     const complaint = new Complaint({
+      complaintId: generateComplaintId(),
       title,
       description,
       department,
       region,
       priority,
+        regionStats,
+  blockStats,        
+  districtStats, 
       user: req.user.id,
       file,
+      state: user.state,
+      district: user.district,
+      block: user.block
     });
 
     await complaint.save();
 
-    // ✅ Fetch full user info
-    const user = await User.findById(req.user.id);
-
-    // ✅ Now use user.email and user.name safely
+    // ✅ Send confirmation email
     await sendEmail(
       user.email,
       "Complaint Received",
       `Hi ${user.name || "User"},\n\nYour complaint has been submitted successfully.\n\nTitle: ${title}\nPriority: ${priority}\n\nWe will get back to you shortly.\n\nThanks,\nComplaint Portal`
     );
 
+    // ✅ Emit real-time event
     const io = req.app.get("io");
     io.emit("newComplaint", complaint);
 
@@ -41,6 +54,7 @@ exports.createComplaint = async (req, res) => {
     res.status(500).json({ msg: "Server Error" });
   }
 };
+
 
 
 
@@ -99,22 +113,23 @@ exports.deleteComplaint = async (req, res) => {
 
     const user = await User.findById(req.user.id);
 
-    // Allow deletion if user is the owner or an admin/superadmin
-    if (
-      complaint.user.toString() !== req.user.id &&
-      user.role !== "admin" &&
-      user.role !== "superadmin"
-    ) {
+    // Only allow admin/superadmin
+    if (!["block-admin", "group-admin", "super-admin"].includes(user.role)) {
+
       return res.status(403).json({ msg: "Unauthorized" });
     }
 
-    await complaint.deleteOne();
-    res.json({ msg: "Complaint deleted successfully" });
+    complaint.status = "Rejected";
+    await complaint.save();
+
+    res.json({ msg: "Complaint marked as Rejected" });
   } catch (err) {
-    console.error("Delete error:", err.message);
+    console.error("Reject error:", err.message);
     res.status(500).json({ msg: "Server Error" });
   }
 };
+
+
 
 
 
@@ -130,6 +145,10 @@ exports.getComplaintStats = async (req, res) => {
       if (user.region) filter.region = user.region;
       if (user.department) filter.department = user.department;
     }
+    if (user.role === "group-admin" || user.role === "block-admin") {
+  filter.district = user.district;
+  filter.state = user.state;
+}
 
     // 1. Count by status
     const statusStats = await Complaint.aggregate([
@@ -168,6 +187,16 @@ const regionStats = await Complaint.aggregate([
   { $match: filter },
   { $group: { _id: "$region", count: { $sum: 1 } } }
 ]);
+const districtStats = await Complaint.aggregate([
+  { $match: filter },
+  { $group: { _id: "$district", count: { $sum: 1 } } }
+]);
+
+const blockStats = await Complaint.aggregate([
+  { $match: filter },
+  { $group: { _id: "$block", count: { $sum: 1 } } }
+]);
+
 
 
 
@@ -201,33 +230,47 @@ exports.getAllComplaints = async (req, res) => {
     const user = await User.findById(req.user.id);
     let filter = {};
 
-    // Admin role-based filtering
-    if (user.role === "admin") {
+    // Role-based filtering
+    if (user.role === "block-admin") {
+      filter.block = user.block;
+      filter.district = user.district;
+      filter.state = user.state;
+    } else if (user.role === "group-admin") {
+      filter.district = user.district;
+      filter.state = user.state;
+    } else if (user.role === "super-admin") {
+      filter.state = user.state;
+    } else if (user.role === "admin") {
       if (user.region) filter.region = user.region;
       if (user.department) filter.department = user.department;
     }
 
-    // Additional filters from query params
+    // ✅ Allow filtering by block only for group-admin and super-admin
+    if ((user.role === "group-admin" || user.role === "super-admin") && req.query.block) {
+      filter.block = req.query.block;
+    }
+
+    // Other filters
     if (req.query.region) filter.region = req.query.region;
     if (req.query.department) filter.department = req.query.department;
     if (req.query.priority) filter.priority = req.query.priority;
     if (req.query.status) filter.status = req.query.status;
 
-    // Keyword search (title or description)
     if (req.query.search) {
       const search = req.query.search;
       filter.$or = [
         { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } }
+        { description: { $regex: search, $options: "i" } },
+        { complaintId: { $regex: search, $options: "i" } },
       ];
     }
 
-    // Pagination
+    // Pagination and Fetching
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-
     const total = await Complaint.countDocuments(filter);
+
     const complaints = await Complaint.find(filter)
       .populate("user", "name email")
       .sort({ createdAt: -1 })
@@ -238,7 +281,7 @@ exports.getAllComplaints = async (req, res) => {
       complaints,
       total,
       page,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
     console.error("Filter error:", err.message);
@@ -247,21 +290,31 @@ exports.getAllComplaints = async (req, res) => {
 };
 
 
+
 // Update complaint status (admin only)
 exports.updateComplaintStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, reason } = req.body;  // ✅ Add `reason`
     const complaint = await Complaint.findById(req.params.id);
     if (!complaint) return res.status(404).json({ msg: "Complaint not found" });
 
     complaint.status = status;
-    await complaint.save();
+
+// Only set rejectReason if status is "Rejected"
+if (status === "Rejected" && req.body.reason) {
+  complaint.rejectReason = req.body.reason;
+} else if (status !== "Rejected") {
+  complaint.rejectReason = ""; // Clear old reason if re-updated
+}
+
+await complaint.save();
 
     res.json({ msg: "Status updated", complaint });
   } catch (err) {
     res.status(500).json({ msg: "Server Error" });
   }
 };
+
 
 // GET /api/complaints/stats
 exports.getStats = async (req, res) => {
